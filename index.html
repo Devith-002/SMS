@@ -89,7 +89,7 @@ onAuthStateChanged(auth,async u=>{
 
 /* ---------- views ---------- */
 function render(){
-  $('#hdr').innerHTML=`<div class="r" style="justify-content:space-between"><div><h1>${esc(C.schoolName||'ប្រព័ន្ធគ្រប់គ្រងសាលា')}</h1>${S.year?`<span class="mu">ឆ្នាំសិក្សា ${esc(S.year)}</span>`:''}</div>${S.me?`<div class="r"><span class="mu">${esc(S.me.email)} (${ROLE[S.role]||'គ្មានតួនាទី'})</span><button class="b" data-a="pw">ប្តូរលេខសម្ងាត់</button><button class="b" data-a="out">ចាកចេញ</button></div>`:S.sv?'<button class="b" data-a="out">ចាកចេញ</button>':''}</div>`;
+  $('#hdr').innerHTML=`<div class="r" style="justify-content:space-between"><div><h1>${esc(C.schoolName||'ប្រព័ន្ធគ្រប់គ្រងសាលា')}</h1>${S.year?`<span class="mu">ឆ្នាំសិក្សា ${esc(S.year)}</span>`:''}</div>${S.me?`<div class="r"><span class="mu">${esc(S.me.email)} (${ROLE[S.role]||'គ្មានតួនាទី'})</span><a class="b" href="timetable.html" style="display:inline-flex;align-items:center;text-decoration:none">កាលវិភាគ</a><button class="b" data-a="pw">ប្តូរលេខសម្ងាត់</button><button class="b" data-a="out">ចាកចេញ</button></div>`:S.sv?'<div class="r"><a class="b" href="timetable.html" style="display:inline-flex;align-items:center;text-decoration:none">កាលវិភាគ</a><button class="b" data-a="out">ចាកចេញ</button></div>':''}</div>`;
   const t=$('#tabs'),m=$('#main');
   if(!S.me){t.innerHTML='';m.innerHTML=S.sv?vStu():vLogin();return}
   if(!S.role){t.innerHTML='';m.innerHTML='<div class="c">គណនីនេះមិនទាន់មានតួនាទី សូមទាក់ទង Admin។</div>';return}
