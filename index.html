@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="km"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ប្រព័ន្ធគ្រប់គ្រងសាលា</title>
+<link rel="manifest" href="manifest.json"><meta name="theme-color" content="#1c4fa0">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;600&family=Koulen&display=swap">
+<style>
+:root{--bg:#f3f5f9;--sf:#fff;--s2:#eef2f8;--ink:#16213a;--mu:#5a6580;--ln:#d9e0ec;--ac:#1c4fa0;--acx:#fff;--bad:#b3261e}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1424;--sf:#151d31;--s2:#1b2540;--ink:#e7ecf8;--mu:#97a3bf;--ln:#2a3656;--ac:#7fa8ff;--acx:#0b1630;--bad:#ff8f86}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 14px/1.7 'Kantumruy Pro','Noto Sans Khmer',system-ui,sans-serif;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+.w{max-width:1100px;margin:0 auto;padding:14px 16px 48px}
+h1{font:400 24px/1.5 Koulen,'Kantumruy Pro',sans-serif;color:var(--ac);margin:0}
+h2{font-size:16px;margin:0 0 12px}
+button,input,select{font:inherit;color:inherit}
+.b{min-height:38px;padding:4px 14px;border-radius:8px;border:1px solid var(--ln);background:var(--sf);cursor:pointer;font-weight:600}
+.b.p{background:var(--ac);border-color:var(--ac);color:var(--acx)}
+.b.d{color:var(--bad);border-color:var(--bad)}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+input,select{width:100%;min-height:38px;padding:4px 10px;border:1px solid var(--ln);border-radius:8px;background:var(--sf)}
+label{display:block;font-size:13px;color:var(--mu);font-weight:600;margin-bottom:10px}
+.c{background:var(--sf);border:1px solid var(--ln);border-radius:12px;padding:16px}
+.r{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--ln);margin:12px 0 16px}
+.tabs button{border:0;background:none;padding:8px 16px;min-height:42px;font-weight:600;color:var(--mu);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+.tabs button[aria-selected=true]{color:var(--ac);border-color:var(--ac)}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--ln)}
+.sc{overflow-x:auto}
+dialog{border:1px solid var(--ln);border-radius:14px;background:var(--sf);color:var(--ink);width:min(440px,calc(100% - 24px));padding:18px}
+dialog::backdrop{background:rgba(10,16,32,.5)}
+.ph{width:96px;height:128px;border-radius:10px;object-fit:cover;background:var(--s2);border:1px solid var(--ln);flex:none}
+.mu{color:var(--mu)}
+.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.sh{display:flex;gap:16px;align-items:center}
+fieldset{border:0;padding:0;margin:0}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:9px;z-index:9;max-width:90%}
+</style></head><body>
+<div class="w"><div id="hdr"></div><div id="tabs" class="tabs" role="tablist"></div><div id="main"></div></div>
+<dialog id="dlg"></dialog><div id="toast" hidden></div>
+<script src="config.js"></script>
+<script type="module">
+import{initializeApp,deleteApp}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import{getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged,sendPasswordResetEmail,createUserWithEmailAndPassword}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import{initializeFirestore,persistentLocalCache,persistentMultipleTabManager,doc,getDoc,getDocs,setDoc,deleteDoc,collection,query,where}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+const C=window.APP_CONFIG||{},$=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const app=initializeApp(C.firebase),auth=getAuth(app);
+const db=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})});
+const S={tab:'students',classes:[],users:[],stu:[],cls:'',year:'',role:null,me:null,sv:null,pend:null};
+const ROLE={admin:'Admin',management:'គណៈគ្រប់គ្រង',teacher:'គ្រូ'};
+const adm=()=>S.role==='admin',mg=()=>adm()||S.role==='management';
+const vc=()=>S.classes.filter(c=>!S.year||c.year===S.year);
+const strong=p=>p.length>=10&&/[A-Za-z]/.test(p)&&/[0-9]/.test(p);
+const toast=m=>{const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,3500)};
+const run=async f=>{try{await f()}catch(e){console.error(e);toast('មានបញ្ហា: '+(e.code||e.message))}};
+const dlg=h=>{$('#dlg').innerHTML=h;$('#dlg').showModal()};
+async function shrink(file,max=320,q=.72){const b=await createImageBitmap(file),k=Math.min(1,max/Math.max(b.width,b.height)),c=document.createElement('canvas');c.width=Math.round(b.width*k);c.height=Math.round(b.height*k);c.getContext('2d').drawImage(b,0,0,c.width,c.height);return c.toDataURL('image/jpeg',q)}
+
+/* ---------- data ---------- */
+async function load(){
+  try{const s=await getDoc(doc(db,'settings','school'));S.year=s.exists()?s.data().year||'':''}catch(e){}
+  const q=await getDocs(collection(db,'classes'));
+  S.classes=q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.grade-b.grade||String(a.name).localeCompare(b.name));
+  if(mg()){const u=await getDocs(collection(db,'users'));S.users=u.docs.map(d=>({id:d.id,...d.data()}))}
+}
+async function loadStudents(){
+  S.stu=[];
+  if(S.cls){const q=await getDocs(query(collection(db,'students'),where('classId','==',S.cls)));S.stu=q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.id.localeCompare(b.id))}
+  render();
+}
+async function loadStu(id){
+  try{
+    const s=await getDoc(doc(db,'students',id));if(!s.exists())return false;
+    const o={id,...s.data()};
+    if(o.hasPhoto){try{o.ph=(await getDoc(doc(db,'photos',id))).data()?.d}catch(e){}}
+    if(o.classId){try{o.cn=(await getDoc(doc(db,'classes',o.classId))).data()?.name}catch(e){}}
+    S.sv=o;localStorage.setItem('sms-sid',id);return true;
+  }catch(e){return null}
+}
+onAuthStateChanged(auth,async u=>{
+  S.me=u;S.role=null;S.sv=null;
+  if(u){
+    try{const d=await getDoc(doc(db,'users',u.uid));S.role=d.exists()?d.data().role:null}catch(e){}
+    if(!S.role&&(C.adminEmails||[]).map(x=>x.toLowerCase()).includes((u.email||'').toLowerCase()))S.role='admin';
+    if(S.role)await run(load);
+  }else if(localStorage.getItem('sms-sid'))await loadStu(localStorage.getItem('sms-sid'));
+  render();
+});
+
+/* ---------- views ---------- */
+function render(){
+  $('#hdr').innerHTML=`<div class="r" style="justify-content:space-between"><div><h1>${esc(C.schoolName||'ប្រព័ន្ធគ្រប់គ្រងសាលា')}</h1>${S.year?`<span class="mu">ឆ្នាំសិក្សា ${esc(S.year)}</span>`:''}</div>${S.me?`<div class="r"><span class="mu">${esc(S.me.email)} (${ROLE[S.role]||'គ្មានតួនាទី'})</span><button class="b" data-a="pw">ប្តូរលេខសម្ងាត់</button><button class="b" data-a="out">ចាកចេញ</button></div>`:S.sv?'<button class="b" data-a="out">ចាកចេញ</button>':''}</div>`;
+  const t=$('#tabs'),m=$('#main');
+  if(!S.me){t.innerHTML='';m.innerHTML=S.sv?vStu():vLogin();return}
+  if(!S.role){t.innerHTML='';m.innerHTML='<div class="c">គណនីនេះមិនទាន់មានតួនាទី សូមទាក់ទង Admin។</div>';return}
+  const tabs=[['students','សិស្ស'],mg()&&['classes','ថ្នាក់'],mg()&&['photos','រូបថតជាបាច់'],adm()&&['staff','បុគ្គលិក']].filter(Boolean);
+  if(!tabs.some(x=>x[0]===S.tab))S.tab='students';
+  t.innerHTML=tabs.map(([k,l])=>`<button role="tab" aria-selected="${k===S.tab}" data-a="tab" data-v="${k}">${l}</button>`).join('');
+  m.innerHTML={students:vStudents,classes:vClasses,photos:vPhotos,staff:vStaff}[S.tab]();
+}
+const vLogin=()=>`<div class="g"><form class="c" data-f="si"><h2>បុគ្គលិក</h2><label>អ៊ីមែល<input type="email" name="email" required autocomplete="username"></label><label>លេខសម្ងាត់<input type="password" name="pw" required autocomplete="current-password"></label><button class="b p">ចូល</button></form><form class="c" data-f="ss"><h2>សិស្ស / អាណាព្យាបាល</h2><label>អត្តលេខ ៤ ខ្ទង់<input name="id" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required></label><button class="b p">មើលព័ត៌មាន</button></form></div>`;
+const vStu=()=>{const s=S.sv;return `<div class="c sh">${s.ph?`<img class="ph" src="${s.ph}" alt="">`:'<div class="ph"></div>'}<div><h1>${esc(s.name)}</h1><p>អត្តលេខ ${esc(s.id)}<br>ភេទ ${esc(s.sex)}<br>ថ្នាក់ ${esc(s.cn||'')}</p></div></div>`};
+function vStudents(){
+  const rows=S.stu.map(s=>`<tr><td>${esc(s.id)}</td><td>${esc(s.name)}</td><td>${esc(s.sex)}</td><td>${s.hasPhoto?'✔':'—'}</td><td><button class="b" data-a="editS" data-v="${s.id}">${mg()?'កែ':'មើល'}</button></td></tr>`).join('');
+  return `<div class="r" style="margin-bottom:12px"><select id="cls" style="max-width:200px"><option value="">ជ្រើសថ្នាក់</option>${vc().map(c=>`<option value="${c.id}" ${c.id===S.cls?'selected':''}>${esc(c.name)}</option>`).join('')}</select><input id="q" placeholder="អត្តលេខ" inputmode="numeric" maxlength="4" style="max-width:120px"><button class="b" data-a="find">ស្វែងរក</button>${mg()?'<button class="b p" data-a="newS">បន្ថែមសិស្ស</button>':''}</div><div class="c sc">${S.cls?(rows?`<table><tr><th>អត្តលេខ</th><th>ឈ្មោះ</th><th>ភេទ</th><th>រូប</th><th></th></tr>${rows}</table>`:'<p class="mu">ថ្នាក់នេះមិនទាន់មានសិស្សទេ</p>'):'<p class="mu">ជ្រើសថ្នាក់ ដើម្បីមើលសិស្ស</p>'}</div>`;
+}
+function vClasses(){
+  const rows=vc().map(c=>`<tr><td>${esc(c.name)}</td><td>${c.grade}</td><td>${esc(c.hrName||'—')}</td><td><button class="b" data-a="editC" data-v="${c.id}">កែ</button></td></tr>`).join('');
+  return `${adm()?`<form class="c r" data-f="yr" style="margin-bottom:12px"><label style="margin:0;flex:1">ឆ្នាំសិក្សាបច្ចុប្បន្ន (ឧ. 2026-2027)<input name="year" value="${esc(S.year)}" required></label><button class="b p">រក្សាទុក</button></form>`:''}<div class="r" style="margin-bottom:12px"><button class="b p" data-a="newC">បន្ថែមថ្នាក់</button></div><div class="c sc">${rows?`<table><tr><th>ថ្នាក់</th><th>កម្រិត</th><th>គ្រូបន្ទុកថ្នាក់</th><th></th></tr>${rows}</table>`:'<p class="mu">មិនទាន់មានថ្នាក់សម្រាប់ឆ្នាំនេះ</p>'}</div>`;
+}
+const vPhotos=()=>`<div class="c"><p>ឈ្មោះឯកសារត្រូវជាអត្តលេខ ឧ. 1234.jpg ។ ប្រព័ន្ធបង្រួមរូប ហើយភ្ជាប់ទៅសិស្សដែលមានអត្តលេខនោះ។</p><label>ជ្រើសថត (កុំព្យូទ័រ)<input id="bf" type="file" accept="image/*" multiple webkitdirectory></label><label>ឬជ្រើសរូបច្រើន<input id="bf2" type="file" accept="image/*" multiple></label><p id="pg" class="mu"></p></div>`;
+function vStaff(){
+  const rows=S.users.map(u=>`<tr><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${ROLE[u.role]||''}</td><td class="r"><button class="b" data-a="rstU" data-v="${u.id}">កំណត់លេខសម្ងាត់ឡើងវិញ</button><button class="b d" data-a="delU" data-v="${u.id}">ដកសិទ្ធិ</button></td></tr>`).join('');
+  return `<div class="r" style="margin-bottom:12px"><button class="b p" data-a="newU">បន្ថែមបុគ្គលិក</button></div><div class="c sc">${rows?`<table><tr><th>ឈ្មោះ</th><th>អ៊ីមែល</th><th>តួនាទី</th><th></th></tr>${rows}</table>`:'<p class="mu">មិនទាន់មានបុគ្គលិក</p>'}</div>`;
+}
+
+/* ---------- dialogs ---------- */
+const btns=(extra='',save=true)=>`<div class="r" style="justify-content:flex-end">${extra}<button type="button" class="b" data-a="x">បិទ</button>${save?'<button class="b p">រក្សាទុក</button>':''}</div>`;
+async function openS(id){
+  S.pend=null;let o={id:'',name:'',sex:'ប្រុស',classId:S.cls||''},ph='';
+  if(id){const s=await getDoc(doc(db,'students',id));if(!s.exists())return toast('រកមិនឃើញអត្តលេខនេះ');o={id,...s.data()};if(o.hasPhoto)ph=(await getDoc(doc(db,'photos',id))).data()?.d||''}
+  dlg(`<form data-f="stu" data-new="${id?'':'1'}"><fieldset ${mg()?'':'disabled'}><div class="sh"><img class="ph" id="pv" src="${ph}" alt=""><div style="flex:1"><label>អត្តលេខ ៤ ខ្ទង់<input name="id" value="${esc(o.id)}" ${id?'readonly':''} pattern="[0-9]{4}" maxlength="4" inputmode="numeric" required></label><label>ឈ្មោះ<input name="name" value="${esc(o.name)}" required></label></div></div><label>ភេទ<select name="sex"><option>ប្រុស</option><option ${o.sex==='ស្រី'?'selected':''}>ស្រី</option></select></label><label>ថ្នាក់<select name="classId" required>${vc().map(c=>`<option value="${c.id}" ${c.id===o.classId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label><label>រូបថត<input type="file" id="pf" accept="image/*"></label></fieldset>${btns(id&&mg()?`<button type="button" class="b d" data-a="delS" data-v="${id}">លុប</button>`:'',mg())}</form>`);
+}
+function openC(id){
+  const c=S.classes.find(x=>x.id===id)||{name:'',grade:7,hr:''};
+  dlg(`<form data-f="cls" data-id="${id}"><label>ឈ្មោះថ្នាក់ (ឧ. 7A)<input name="name" value="${esc(c.name)}" required></label><label>កម្រិត<select name="grade">${[7,8,9,10,11,12].map(g=>`<option ${g===c.grade?'selected':''}>${g}</option>`).join('')}</select></label><label>គ្រូបន្ទុកថ្នាក់<select name="hr"><option value="">—</option>${S.users.map(u=>`<option value="${u.id}" ${u.id===c.hr?'selected':''}>${esc(u.name)}</option>`).join('')}</select></label>${btns(id?`<button type="button" class="b d" data-a="delC" data-v="${id}">លុប</button>`:'')}</form>`);
+}
+const openU=()=>dlg(`<form data-f="usr"><label>ឈ្មោះ<input name="name" required></label><label>អ៊ីមែល<input type="email" name="email" required></label><label>តួនាទី<select name="role"><option value="teacher">គ្រូ</option><option value="management">គណៈគ្រប់គ្រង</option><option value="admin">Admin</option></select></label><label>លេខសម្ងាត់ដំបូង (យ៉ាងតិច ១០ តួ មានអក្សរ និងលេខ)<input name="pw" type="password" autocomplete="new-password" required></label>${btns()}</form>`);
+
+/* ---------- actions ---------- */
+async function saveS(f){
+  const id=f.id.value.trim(),name=f.name.value.trim();
+  if(!/^[0-9]{4}$/.test(id)||!name||!f.classId.value)return toast('ពិនិត្យអត្តលេខ ឈ្មោះ និងថ្នាក់');
+  if(f.dataset.new&&(await getDoc(doc(db,'students',id))).exists())return toast('អត្តលេខនេះមានរួចហើយ');
+  const d={name,sex:f.sex.value,classId:f.classId.value};
+  if(S.pend){await setDoc(doc(db,'photos',id),{d:S.pend});d.hasPhoto=true}
+  await setDoc(doc(db,'students',id),d,{merge:true});
+  S.pend=null;$('#dlg').close();toast('បានរក្សាទុក');S.cls=d.classId;await loadStudents();
+}
+async function bulk(files){
+  let ok=0;const skip=[],pg=$('#pg');
+  for(let i=0;i<files.length;i++){
+    const f=files[i],id=(f.name.match(/^([0-9]{4})\.[^.]+$/)||[])[1];pg.textContent=`${i+1}/${files.length}`;
+    if(!id){skip.push(f.name);continue}
+    try{
+      if(!(await getDoc(doc(db,'students',id))).exists()){skip.push(f.name);continue}
+      await setDoc(doc(db,'photos',id),{d:await shrink(f)});await setDoc(doc(db,'students',id),{hasPhoto:true},{merge:true});ok++;
+    }catch(e){skip.push(f.name)}
+  }
+  pg.innerHTML=`បានភ្ជាប់ ${ok} រូប, រំលង ${skip.length}${skip.length?'<br>'+esc(skip.slice(0,30).join(', ')):''}`;
+}
+const acts={
+  tab:v=>{S.tab=v;render()},
+  out:async()=>{localStorage.removeItem('sms-sid');S.sv=null;await signOut(auth);render()},
+  pw:()=>run(async()=>{await sendPasswordResetEmail(auth,S.me.email);toast('បានផ្ញើតំណទៅអ៊ីមែលរបស់អ្នក')}),
+  x:()=>$('#dlg').close(),
+  newS:()=>run(()=>openS('')),editS:v=>run(()=>openS(v)),
+  find:()=>{const v=$('#q').value.trim();/^[0-9]{4}$/.test(v)?run(()=>openS(v)):toast('បញ្ចូលអត្តលេខ ៤ ខ្ទង់')},
+  delS:v=>confirm('លុបសិស្សនេះ?')&&run(async()=>{await deleteDoc(doc(db,'photos',v));await deleteDoc(doc(db,'students',v));$('#dlg').close();await loadStudents()}),
+  newC:()=>openC(''),editC:v=>openC(v),
+  delC:v=>confirm('លុបថ្នាក់នេះ?')&&run(async()=>{await deleteDoc(doc(db,'classes',v));$('#dlg').close();await load();render()}),
+  newU:openU,
+  rstU:v=>run(async()=>{await sendPasswordResetEmail(auth,S.users.find(x=>x.id===v).email);toast('បានផ្ញើតំណកំណត់លេខសម្ងាត់')}),
+  delU:v=>confirm('ដកសិទ្ធិបុគ្គលិកនេះ?')&&run(async()=>{await deleteDoc(doc(db,'users',v));await load();render()})
+};
+const forms={
+  si:f=>run(async()=>{try{await signInWithEmailAndPassword(auth,f.email.value.trim(),f.pw.value)}catch(x){toast('អ៊ីមែល ឬលេខសម្ងាត់មិនត្រឹមត្រូវ')}}),
+  ss:f=>run(async()=>{const r=await loadStu(f.id.value.trim());if(r===false)toast('រកមិនឃើញអត្តលេខនេះ');else if(r===null)toast('មិនអាចតភ្ជាប់បាន');render()}),
+  stu:f=>run(()=>saveS(f)),
+  yr:f=>run(async()=>{await setDoc(doc(db,'settings','school'),{year:f.year.value.trim()},{merge:true});S.year=f.year.value.trim();S.cls='';S.stu=[];render();toast('បានរក្សាទុក')}),
+  cls:f=>run(async()=>{
+    if(!S.year)return toast('កំណត់ឆ្នាំសិក្សាជាមុន (Admin)');
+    const id=f.dataset.id||doc(collection(db,'classes')).id,old=S.classes.find(c=>c.id===id),u=S.users.find(x=>x.id===f.hr.value);
+    await setDoc(doc(db,'classes',id),{name:f.name.value.trim(),grade:+f.grade.value,year:old?.year||S.year,hr:f.hr.value,hrName:u?.name||''});
+    $('#dlg').close();await load();render();
+  }),
+  usr:f=>run(async()=>{
+    const em=f.email.value.trim().toLowerCase(),pw=f.pw.value;
+    if(!strong(pw))return toast('លេខសម្ងាត់ត្រូវមានយ៉ាងតិច ១០ តួ មានអក្សរ និងលេខ');
+    const sec=initializeApp(C.firebase,'s'+Date.now());
+    try{const a=getAuth(sec),cr=await createUserWithEmailAndPassword(a,em,pw);await setDoc(doc(db,'users',cr.user.uid),{name:f.name.value.trim(),email:em,role:f.role.value});await signOut(a)}finally{await deleteApp(sec)}
+    $('#dlg').close();await load();render();toast('បានបង្កើតគណនី');
+  })
+};
+document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(b)acts[b.dataset.a]?.(b.dataset.v)});
+document.addEventListener('change',e=>{const t=e.target;
+  if(t.id==='cls'){S.cls=t.value;run(loadStudents)}
+  else if(t.id==='pf'&&t.files[0])run(async()=>{S.pend=await shrink(t.files[0]);$('#pv').src=S.pend});
+  else if((t.id==='bf'||t.id==='bf2')&&t.files.length)run(()=>bulk([...t.files]));
+});
+document.addEventListener('submit',e=>{e.preventDefault();forms[e.target.dataset.f]?.(e.target)});
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script></body></html>
