@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="km"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>វត្តមាន</title><link rel="manifest" href="manifest.json"><meta name="theme-color" content="#1c4fa0">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;600&family=Koulen&display=swap">
+<style>
+:root{--bg:#f3f5f9;--sf:#fff;--s2:#eef2f8;--ink:#16213a;--mu:#5a6580;--ln:#d9e0ec;--ac:#1c4fa0;--acx:#fff;--bad:#b3261e}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1424;--sf:#151d31;--s2:#1b2540;--ink:#e7ecf8;--mu:#97a3bf;--ln:#2a3656;--ac:#7fa8ff;--acx:#0b1630;--bad:#ff8f86}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 14px/1.7 'Kantumruy Pro','Noto Sans Khmer',system-ui,sans-serif;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+.w{max-width:1100px;margin:0 auto;padding:14px 16px 48px}
+h1{font:400 24px/1.5 Koulen,'Kantumruy Pro',sans-serif;color:var(--ac);margin:0}
+h2{font-size:16px;margin:0 0 12px}
+button,input,select{font:inherit;color:inherit}
+.b{min-height:38px;padding:4px 14px;border-radius:8px;border:1px solid var(--ln);background:var(--sf);cursor:pointer;font-weight:600}
+.b.p{background:var(--ac);border-color:var(--ac);color:var(--acx)}
+.b.d{color:var(--bad);border-color:var(--bad)}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+input,select{width:100%;min-height:38px;padding:4px 10px;border:1px solid var(--ln);border-radius:8px;background:var(--sf)}
+label{display:block;font-size:13px;color:var(--mu);font-weight:600;margin-bottom:10px}
+.c{background:var(--sf);border:1px solid var(--ln);border-radius:12px;padding:16px}
+.r{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--ln);margin:12px 0 16px}
+.tabs button{border:0;background:none;padding:8px 16px;min-height:42px;font-weight:600;color:var(--mu);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+.tabs button[aria-selected=true]{color:var(--ac);border-color:var(--ac)}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--ln)}
+.sc{overflow-x:auto}
+dialog{border:1px solid var(--ln);border-radius:14px;background:var(--sf);color:var(--ink);width:min(440px,calc(100% - 24px));padding:18px}
+dialog::backdrop{background:rgba(10,16,32,.5)}
+.ph{width:96px;height:128px;border-radius:10px;object-fit:cover;background:var(--s2);border:1px solid var(--ln);flex:none}
+.mu{color:var(--mu)}
+.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.sh{display:flex;gap:16px;align-items:center}
+fieldset{border:0;padding:0;margin:0}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:9px;z-index:9;max-width:90%}
+.er{color:var(--bad)}a.b{display:inline-flex;align-items:center;text-decoration:none;color:inherit}.cd{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}.cd .c{text-align:center}.cd b{font:400 26px/1.3 Koulen,sans-serif;display:block;color:var(--ac)}</style></head><body>
+<div class="w"><div id="hdr"></div><div id="tabs" class="tabs" role="tablist"></div><div id="main"></div></div>
+<dialog id="dlg"></dialog><div id="toast" hidden></div>
+<script src="config.js"></script>
+<script type="module">
+import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import{getAuth,onAuthStateChanged}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import{initializeFirestore,persistentLocalCache,persistentMultipleTabManager,doc,getDoc,getDocs,setDoc,collection,query,where,serverTimestamp}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+const C=window.APP_CONFIG||{},$=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const app=initializeApp(C.firebase),auth=getAuth(app);
+const db=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})});
+const GRACE=0,MAXD=500,KD='០១២៣៤៥៦៧៨៩';
+const nz=s=>String(s||'').replace(/[០-៩]/g,d=>KD.indexOf(d)).replace(/\s+/g,'').toLowerCase();
+const pad=n=>String(n).padStart(2,'0'),ymd=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()),hm=m=>pad(Math.floor(m/60)%24)+':'+pad(m%60);
+const pmin=s=>{const m=/^(\d{1,2}):(\d{2})$/.exec(s||'');return m?+m[1]*60+ +m[2]:0};
+const dayIdx=d=>(new Date(d+'T00:00:00').getDay()+6)%7,nowMin=()=>{const n=new Date();return n.getHours()*60+n.getMinutes()};
+const CODE={P:'មក',A:'អវត្តមាន',L:'យឺត',E:'មានច្បាប់'},DAYS=['ច័ន្ទ','អង្គារ','ពុធ','ព្រហស្បតិ៍','សុក្រ','សៅរ៍'];
+const S={role:null,me:null,name:'',sid:null,tt:null,school:{},fc:{},tid:null,tab:'',cache:{},mk:null,stu:null,trDate:'',trData:null};
+const toast=m=>{const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,4000)};
+const run=async f=>{try{await f()}catch(e){console.error(e);toast('មានបញ្ហា: '+(e.code||e.message))}};
+const dlg=h=>{$('#dlg').innerHTML=h;$('#dlg').showModal()},msg=t=>`<div class="c"><p class="mu">${t}</p></div>`;
+const gps=()=>new Promise((ok,no)=>navigator.geolocation?navigator.geolocation.getCurrentPosition(p=>ok(p.coords),no,{enableHighAccuracy:true,timeout:15000,maximumAge:0}):no(new Error('gps')));
+const hav=(a,b,c,d)=>{const r=x=>x*Math.PI/180,q=Math.sin(r(c-a)/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(r(d-b)/2)**2;return 12742000*Math.asin(Math.sqrt(q))};
+function parseTT(j){
+  const o=JSON.parse(j),st=o.settings,P=st.amPeriods+st.pmPeriods,sc=o.schedule,ok=sc&&sc.days===st.days&&sc.am===st.amPeriods&&sc.pm===st.pmPeriods,cn={},tn={},sn={};
+  o.classes.forEach(c=>cn[c.id]=c.name);o.teachers.forEach(t=>tn[t.id]=t.name);o.subjects.forEach(s=>sn[s.id]=s.name);
+  return{st,P,cn,tn,sn,les:ok?sc.lessons.map(l=>({c:l[0],s:l[1],t:l[2],d:Math.floor(l[3]/P),p:l[3]%P})):[]};
+}
+const start=(T,p)=>{const s=T.st,am=s.amPeriods,x=p>=am,i=x?p-am:p;return(pmin(x?s.afternoonStart:s.morningStart)||(x?780:420))+i*s.lessonMin+(s.breakAfter>0&&i>=s.breakAfter?s.breakMin:0)};
+const cid2fc=c=>S.fc[nz(S.tt.cn[c])];
+async function loadDay(date,fcs){await Promise.all(fcs.map(async f=>{const k=f+'_'+date;if(!(k in S.cache)){try{const s=await getDoc(doc(db,'att',k));S.cache[k]=s.exists()?s.data():{}}catch(e){S.cache[k]={}}}}))}
+const todayL=()=>S.tt.les.filter(l=>l.t===S.tid&&l.d===dayIdx(ymd(new Date()))).sort((a,b)=>a.p-b.p);
+
+onAuthStateChanged(auth,async u=>{
+  S.me=u;S.role=null;S.sid=null;S.name='';
+  if(u){
+    try{const d=await getDoc(doc(db,'users',u.uid));if(d.exists()){S.role=d.data().role;S.name=d.data().name||''}}catch(e){}
+    if(!S.role&&(C.adminEmails||[]).map(x=>String(x).trim().toLowerCase()).includes((u.email||'').toLowerCase()))S.role='admin';
+  }else S.sid=localStorage.getItem('sms-sid');
+  if(!S.role&&!S.sid){location.replace('index.html');return}
+  await run(init);
+  const t=tabs();await go(t[0]?t[0][0]:'');
+});
+async function init(){
+  const[t,sc]=await Promise.all([getDoc(doc(db,'timetable','state')),getDoc(doc(db,'settings','school'))]);
+  S.school=sc.exists()?sc.data():{};S.tt=t.exists()?parseTT(t.data().json):null;S.fc={};S.tid=null;
+  if(S.me){
+    const q=await getDocs(collection(db,'classes'));
+    q.docs.forEach(d=>{const c=d.data();if(!S.school.year||c.year===S.school.year)S.fc[nz(c.name)]=d.id});
+    if(S.tt){const e=Object.entries(S.tt.tn).find(([,n])=>nz(n)===nz(S.name));S.tid=e?+e[0]:null}
+  }
+}
+function tabs(){
+  if(S.sid)return[['mine','អវត្តមានរបស់ខ្ញុំ']];
+  const t=[];if(S.role==='teacher'||S.tid!=null)t.push(['today','ថ្ងៃនេះ']);
+  if(S.role==='admin')t.push(['sub','ចុះជំនួស']);
+  if(S.role==='admin'||S.role==='management')t.push(['tr','វត្តមានគ្រូ']);
+  if(S.role==='admin')t.push(['loc','ទីតាំងសាលា']);
+  return t;
+}
+async function go(t){
+  S.tab=t;
+  await run(async()=>{
+    if(t==='today'&&S.tt&&S.tid!=null){const L=todayL();await loadDay(ymd(new Date()),[...new Set(L.map(l=>cid2fc(l.c)).filter(Boolean))])}
+    if(t==='mine')await loadMine();
+  });
+  render();
+}
+function render(){
+  $('#hdr').innerHTML=`<div class="r" style="justify-content:space-between"><div><h1>${esc(C.schoolName||'វត្តមាន')}</h1><span class="mu">វត្តមានតាមម៉ោង</span></div><div class="r"><a class="b" href="index.html">← ទំព័រមេ</a><a class="b" href="timetable.html">កាលវិភាគ</a></div></div>`;
+  $('#tabs').innerHTML=tabs().map(([k,l])=>`<button role="tab" aria-selected="${k===S.tab}" data-a="tab" data-v="${k}">${l}</button>`).join('');
+  $('#main').innerHTML=({today:vToday,sub:vSub,tr:vTr,loc:vLoc,mine:vMine}[S.tab]||(()=>''))();
+}
+function vToday(){
+  const T=S.tt;if(!T)return msg('មិនទាន់មានកាលវិភាគ');
+  if(S.tid==null)return msg('ឈ្មោះគណនី «'+esc(S.name)+'» មិនត្រូវនឹងឈ្មោះគ្រូក្នុងកាលវិភាគ សូមទាក់ទង Admin');
+  const L=todayL(),date=ymd(new Date()),m=nowMin();
+  if(!L.length)return msg('ថ្ងៃនេះគ្មានម៉ោងបង្រៀន');
+  const rows=L.map(l=>{
+    const f=cid2fc(l.c),e=f&&(S.cache[f+'_'+date]||{})['p'+l.p],st=start(T,l.p),en=st+T.st.lessonMin,inw=m>=st-GRACE&&m<=en;
+    const tag=e?'✔ ចុះរួច':m<st-GRACE?'មិនទាន់ដល់ម៉ោង':m>en?'<span class="er">ផុតម៉ោង</span>':'កំពុងបង្រៀន';
+    return`<tr><td>${hm(st)}–${hm(en)}</td><td>${esc(T.cn[l.c])}</td><td>${esc(T.sn[l.s]||'')}</td><td>${tag}</td><td>${!f?'<span class="er">ថ្នាក់មិនត្រូវគ្នា</span>':inw?`<button class="b p" data-a="open" data-v="${l.c}:${l.p}">${e?'កែ':'ចុះវត្តមាន'}</button>`:''}</td></tr>`;
+  }).join('');
+  return`<div class="c sc"><table><tr><th>ម៉ោង</th><th>ថ្នាក់</th><th>មុខវិជ្ជា</th><th>ស្ថានភាព</th><th></th></tr>${rows}</table></div>`;
+}
+function vSub(){
+  const T=S.tt;if(!T)return msg('មិនទាន់មានកាលវិភាគ');
+  const cs=Object.entries(T.cn).sort((a,b)=>nz(a[1]).localeCompare(nz(b[1])));
+  return`<form class="c" data-f="sub" style="max-width:420px"><p class="mu">Admin ចុះវត្តមានជំនួសគ្រូ (គ្មានការកំណត់ម៉ោង/ទីតាំង)</p><label>ថ្ងៃ<input type="date" name="date" value="${ymd(new Date())}" required></label><label>ថ្នាក់<select name="c">${cs.map(([i,n])=>`<option value="${i}">${esc(n)}</option>`).join('')}</select></label><label>ម៉ោង<select name="p">${Array.from({length:T.P},(_,i)=>`<option value="${i}">ម៉ោងទី ${i+1} (${hm(start(T,i))})</option>`).join('')}</select></label><button class="b p">បើកបញ្ជីសិស្ស</button></form>`;
+}
+function vTr(){
+  const T=S.tt,date=S.trDate||ymd(new Date());
+  const form=`<form class="c r" data-f="tr" style="margin-bottom:12px"><label style="margin:0"><input type="date" name="date" value="${date}" required></label><button class="b p">មើល</button></form>`;
+  if(!T)return msg('មិនទាន់មានកាលវិភាគ');if(!S.trData)return form;
+  const di=dayIdx(date),td=ymd(new Date()),m=nowMin(),L=T.les.filter(l=>l.d===di).sort((a,b)=>a.p-b.p||nz(T.cn[a.c]).localeCompare(nz(T.cn[b.c])));let ok=0;
+  const rows=L.map(l=>{
+    const f=cid2fc(l.c),e=f&&(S.trData[f+'_'+date]||{})['p'+l.p],en=start(T,l.p)+T.st.lessonMin;let s;
+    if(e){ok++;const tm=new Date(e.ts);s=e.by==='admin'?'Admin ចុះជំនួស':'✔ '+hm(tm.getHours()*60+tm.getMinutes())+(e.dist!=null?' ('+e.dist+'m)':'')+(e.sv&&e.sv.toMillis&&Math.abs(e.sv.toMillis()-e.ts)>300000?' ⚠ ម៉ោងលម្អៀង':'')}
+    else s=date>td||(date===td&&m<=en)?'មិនទាន់':'<span class="er">✖ គ្មានកំណត់ត្រា</span>';
+    return`<tr><td>${hm(start(T,l.p))}</td><td>${esc(T.cn[l.c])}</td><td>${esc(T.tn[l.t]||'')}</td><td>${s}</td></tr>`;
+  }).join('');
+  return form+`<p>${DAYS[di]||''} បានចុះ ${ok} / ${L.length} ម៉ោង</p><div class="c sc"><table><tr><th>ម៉ោង</th><th>ថ្នាក់</th><th>គ្រូ</th><th>វត្តមានគ្រូ</th></tr>${rows}</table></div>`;
+}
+const vLoc=()=>`<div class="c" style="max-width:460px"><p>ទីតាំងសាលា: ${S.school.lat!=null?esc(S.school.lat)+', '+esc(S.school.lng):'<span class="er">មិនទាន់កំណត់</span>'}</p><p class="mu">ឈរនៅសាលា (ជិតបរិវេណកណ្តាល) ហើយចុចប៊ូតុង។ គ្រូចុះវត្តមានបានតែក្នុងរង្វង់ ${MAXD}m។</p><button class="b p" data-a="setLoc">កំណត់ទីតាំងបច្ចុប្បន្នជាទីតាំងសាលា</button></div>`;
+async function loadMine(){
+  const s=await getDoc(doc(db,'students',S.sid));
+  if(!s.exists()){localStorage.removeItem('sms-sid');location.replace('index.html');return}
+  const o={id:S.sid,...s.data()},cl=o.classId?await getDoc(doc(db,'classes',o.classId)):null;o.cn=cl&&cl.exists()?cl.data().name:'';
+  const ds=[];for(let i=0;i<30;i++){const d=new Date();d.setDate(d.getDate()-i);ds.push(ymd(d))}
+  const docs=await Promise.all(ds.map(d=>getDoc(doc(db,'att',o.classId+'_'+d)).then(x=>[d,x.exists()?x.data():null]).catch(()=>[d,null])));
+  const rec=[];let tot=0;
+  docs.forEach(([d,x])=>{if(!x)return;Object.keys(x).forEach(k=>{if(!/^p[0-9]+$/.test(k))return;tot++;const c=x[k].x&&x[k].x[S.sid];if(c)rec.push({d,p:+k.slice(1),c})})});
+  S.stu={o,rec,tot};
+}
+function vMine(){
+  if(!S.stu)return'';const{o,rec,tot}=S.stu,T=S.tt,n=k=>rec.filter(r=>r.c===k).length;
+  const cid=T&&(Object.entries(T.cn).find(([,x])=>nz(x)===nz(o.cn))||[])[0];
+  const rows=rec.map(r=>{const l=T&&T.les.find(x=>String(x.c)===String(cid)&&x.p===r.p&&x.d===dayIdx(r.d));return`<tr><td>${r.d}</td><td>ម៉ោងទី ${r.p+1}</td><td>${esc(l&&T.sn[l.s]||'')}</td><td>${CODE[r.c]||r.c}</td></tr>`}).join('');
+  return`<p><b>${esc(o.name)}</b> (ថ្នាក់ ${esc(o.cn)}) ក្នុង ៣០ ថ្ងៃចុងក្រោយ</p><div class="cd"><div class="c"><b>${n('A')}</b>អវត្តមាន</div><div class="c"><b>${n('L')}</b>យឺត</div><div class="c"><b>${n('E')}</b>មានច្បាប់</div></div><div class="c sc">${rows?`<table><tr><th>ថ្ងៃ</th><th>ម៉ោង</th><th>មុខវិជ្ជា</th><th>ស្ថានភាព</th></tr>${rows}</table>`:'<p class="mu">គ្មានអវត្តមាន ឬយឺត ពី '+tot+' ម៉ោងដែលបានចុះ</p>'}</div>`;
+}
+async function openMark(c,p,admin,date){
+  const T=S.tt,f=cid2fc(c);if(!f)return toast('ថ្នាក់នេះមិនត្រូវនឹងថ្នាក់ក្នុងប្រព័ន្ធសិស្ស');
+  const l=T.les.find(x=>x.c===c&&x.p===p&&x.d===dayIdx(date));if(!l)return toast('គ្មានម៉ោងនេះក្នុងកាលវិភាគ');
+  const q=await getDocs(query(collection(db,'students'),where('classId','==',f))),stu=q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.id.localeCompare(b.id));
+  await loadDay(date,[f]);const old=(S.cache[f+'_'+date]||{})['p'+p],ox=old&&old.x||{};
+  S.mk={f,c,p,date,admin,tid:l.t,stu};
+  dlg(`<form data-f="mk"><h2>${esc(T.cn[c])} ម៉ោងទី ${p+1} (${esc(T.sn[l.s]||'')})</h2><div style="max-height:55vh;overflow:auto;margin-bottom:12px">${stu.map(s=>`<div class="r" style="justify-content:space-between;margin-bottom:6px"><span>${esc(s.name)} <span class="mu">${s.id}</span></span><select name="s_${s.id}" style="width:auto">${['P','A','L','E'].map(k=>`<option value="${k}" ${(ox[s.id]||'P')===k?'selected':''}>${CODE[k]}</option>`).join('')}</select></div>`).join('')||'<p class="mu">ថ្នាក់នេះមិនទាន់មានសិស្ស</p>'}</div><div class="r" style="justify-content:flex-end"><button type="button" class="b" data-a="x">បិទ</button><button class="b p" ${stu.length?'':'disabled'}>រក្សាទុក</button></div></form>`);
+}
+async function saveMark(f){
+  const{f:fc,c,p,date,admin,tid,stu}=S.mk,T=S.tt;let pos=null,dist=null;
+  if(!admin){
+    if(S.school.lat==null)return toast('Admin មិនទាន់កំណត់ទីតាំងសាលា');
+    const m=nowMin(),st=start(T,p);if(m<st-GRACE||m>st+T.st.lessonMin)return toast('ផុតម៉ោង ឬមិនទាន់ដល់ម៉ោងរបស់អ្នក');
+    try{pos=await gps()}catch(e){return toast('មិនអាចទាញទីតាំងបាន សូមអនុញ្ញាតទីតាំង (GPS)')}
+    dist=hav(pos.latitude,pos.longitude,S.school.lat,S.school.lng);
+    if(dist>MAXD)return toast('អ្នកនៅឆ្ងាយពីសាលា '+Math.round(dist)+'m (អនុញ្ញាត '+MAXD+'m)');
+  }
+  const x={};stu.forEach(s=>{const v=f['s_'+s.id].value;if(v!=='P')x[s.id]=v});
+  const e={tid,uid:S.me.uid,by:admin?'admin':'teacher',ts:Date.now(),sv:serverTimestamp(),n:stu.length,x};
+  if(pos){e.lat=+pos.latitude.toFixed(5);e.lng=+pos.longitude.toFixed(5);e.acc=Math.round(pos.accuracy);e.dist=Math.round(dist)}
+  const k=fc+'_'+date;
+  setDoc(doc(db,'att',k),{cls:fc,date,['p'+p]:e},{mergeFields:['cls','date','p'+p]}).catch(er=>toast('រក្សាទុកមិនបាន: '+(er.code||er.message)));
+  S.cache[k]={...(S.cache[k]||{}),cls:fc,date,['p'+p]:{...e,sv:null}};
+  $('#dlg').close();toast('បានរក្សាទុក (នឹង sync ស្វ័យប្រវត្តិពេលមានអ៊ីនធឺណិត)');S.trData=null;render();
+}
+const acts={
+  tab:v=>go(v),x:()=>$('#dlg').close(),
+  open:v=>{const[c,p]=v.split(':');run(()=>openMark(+c,+p,false,ymd(new Date())))},
+  setLoc:()=>run(async()=>{let g;try{g=await gps()}catch(e){return toast('មិនអាចទាញទីតាំងបាន')}
+    const lat=+g.latitude.toFixed(6),lng=+g.longitude.toFixed(6);await setDoc(doc(db,'settings','school'),{lat,lng},{merge:true});S.school={...S.school,lat,lng};render();toast('បានកំណត់ទីតាំងសាលា (ភាពត្រឹមត្រូវ ±'+Math.round(g.accuracy)+'m)')})
+};
+const forms={
+  sub:f=>run(()=>openMark(+f.c.value,+f.p.value,true,f.date.value)),
+  tr:f=>run(async()=>{const date=f.date.value,q=await getDocs(query(collection(db,'att'),where('date','==',date))),m={};q.docs.forEach(d=>m[d.id]=d.data());S.trDate=date;S.trData=m;render()}),
+  mk:f=>run(()=>saveMark(f))
+};
+document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(b)acts[b.dataset.a]?.(b.dataset.v)});
+document.addEventListener('submit',e=>{e.preventDefault();forms[e.target.dataset.f]?.(e.target)});
+</script></body></html>
